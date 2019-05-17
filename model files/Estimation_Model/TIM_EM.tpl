@@ -1165,7 +1165,7 @@ FUNCTION get_movement
             {
              for (int x=1;x<=T_est_freq;x++)
               {            
-               T(j,r,x+(y-1)*T_est_freq,a,k,n)=G(r+nreg_temp(j),n+nreg_temp(k))/G_temp(r+nreg_temp(j));           
+               T(j,r,min(x+(y-1)*T_est_freq,nyrs),a,k,n)=G(r+nreg_temp(j),n+nreg_temp(k))/G_temp(r+nreg_temp(j));           
             }
            } 
           }
@@ -1214,7 +1214,7 @@ FUNCTION get_movement
              {
               for(int z=1;z<=T_est_age_freq;z++)
                {
-                 T(j,r,x+(y-1)*T_est_freq,z+(a-1)*T_est_age_freq,k,n)=G(r+nreg_temp(j),n+nreg_temp(k))/G_temp(r+nreg_temp(j));
+                 T(j,r,min(x+(y-1)*T_est_freq,nyrs),min(z+(a-1)*T_est_age_freq,nages),k,n)=G(r+nreg_temp(j),n+nreg_temp(k))/G_temp(r+nreg_temp(j));
                }
               }
              }
