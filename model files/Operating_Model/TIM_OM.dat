@@ -1,4 +1,4 @@
-
+####TEST BASE MODEL 4 TIM####
 
 #OM_structure
 #   // ==0 the OM is panmictic
@@ -22,23 +22,6 @@
 #nfleets_survey
 1
 1
-
-# // INDICES FOR RNG...use these to input the MAX values across ALL runs/scenarios for a simulation experiment so that always have consistent RNG values
-#max_pops
-2
-#max_regs
-1
-#max_ages
-8
-#max_yrs
-30
-#max_flts
-1
-#max_surv_flts
-1
-#max_tag_yrs
-30
-############################################
 
 #model_type_switch
   #==0 do not use TAC to set F
@@ -95,14 +78,13 @@
 0.5
 
 #larval_move_switch  ## THIS NEEDS TO BE SET ==1 if the OM is being used for estimation##
-  #==(-1) larval movement is determined same as other ages (e.g., by move_switch)
   #==0 no movement
   #==1 input movement
   #==2 movement within stock only based on residency (symmetric)
   #==3 symmetric movement but only allow movement within a stock (ie regions within a stock) not across stocks
   #==4 symmetric movement across all stocks and regions
   #==5 allow movement across all regions and stocks, based on stock/region specific residency (symmetric off diagnol)
--1
+1
 
 #move_switch
   #==0 no movement
@@ -117,15 +99,14 @@
   #==8 density dependent movement based on relative biomass among potential destination area/regions, partitions (1-input_residency) based on a logistic function of biomass in current area/region and 'suitability' of destination area/regions
   #// uses use_input_Bstar switch
   #// DD MOVEMENT CAN BE AGE BASED OR CONSTANT ACROSS AGES...FOR AGE BASED MAKE SURE DD_move_age_switch==1, FOR AGE-INVARIANT DD_move_age_switch==0
-  #==9 use input T_year to allow T to vary by year
-  #==10 use T_Full_Input to input time and age varying T
+  #==21 use input T_year to allow T to vary by year
+  #==22 use T_Full_Input to input time and age varying T
 8
 
-#rand_move
- #///adjust movement to include random variation based on input sigma and lognormal random variable (by year and age)
- #// if either move_switch or larval_move_switch set 0 (no move), then rand_move is bypassed
-  #//==0 no randomness, just use movement
-  #//==1 add randomness (bounded so Fract move cannot exceed 1 or go below 0)
+#init_number rand_move
+ #///adjust DD movement to include random variation based on input sigma and lognormal random variable
+  #//==0 no randomness, just use movement from DD calculations
+  #//==1 add randomness to DD calculations (bounded so Fract move cannot exceed 1 or go below 0)
 1
 ## DD_move_age_switch
  #Allow age-based movement when using DD movement (Y/N) (1/0)
@@ -260,33 +241,7 @@
   #==0, fit by age-based cohorts
   #==1, fit by region-based cohorts
 0
-#tag_fit_ages_OM
-  #determines if OM matches EM for sims with no age dynamics of tags
-  #DOES NOT WORK WITH TAG MIXING!!!
-  #==0, OM does not match EM
-  #==1, OM matches EM
-0
 
-#sim_tag_mixing_switch
- #//determines whether tags have a different F or T in first year of release compared to rest of population (i.e., if there is incomplete mixing)
- #//==0 F and T same as rest of pop (complete mixing)
- #//==1 F and/or T have are different from rest of population (incomplete mixing)
-0
-
-#sim_tag_mixing_T_switch
-  #//determines whether tags have a differentT in first year of release compared to rest of population (i.e., if there is incomplete mixing)
-  #//==0 T same as rest of pop (complete mixing)
-  #//==1 T  are different from rest of population (incomplete mixing)
-0 
-#est_tag_mixing_switch
- #//determines whether different F or T compared to rest of population in first year of release are estimated  (i.e., estimate F and/or T to account for  incomplete mixing)
- #//==0 F and T same as rest of pop (assume complete mixing)
- #//==1 F is estimated different from rest of population (incomplete mixing F only) in first year of release
- #//==2 T is estimated different from rest of population (incomplete mixing T only) in first year of release
- #//==3 F AND T are estimated different from rest of population (incomplete mixing F AND T) in first year of release
- # NOTE: est model only setup to est an F scalar between 0 and 1 (i.e., F_tag less than F for incomplete mixing)
- # EST model not setup to do tag mixing and fit by region based cohorts (i.e., can't use with tag_fit_ages==1)
-0
 #/////tagging data parameters
 #nyrs_release
   #number of years with tag release events
@@ -319,6 +274,7 @@
 0.15
 0.15
 0.15
+
 #max_tags (1,np,1,nreg)
  #maximum tags for uniform distribution if tags_switch==4 or 5
 3000
@@ -336,9 +292,6 @@
 #max_life_tags
   #number of years that tag recaptures will be tallied for after release (assume proportional to longevity of the species)...use this to avoid calculating tag recaptures for all remaining model years after release since # recaptures are often extremely limited after a few years after release
 5
-#age_full_selection
-  #for sims with tag age not fit directly, this is the age that use for F
-8
 #SIM_ntag
   #the ESS used to simulate multinomial tagging data
 200
@@ -368,36 +321,17 @@
 0.8
 0.8
 
-#F_tag_scalar
- #scalar on all tag Fs in year of release (MUST BE >= 0)
-0.75
-0.72
-0.79
-0.74
-0.78
-0.77
-0.73
-#T_tag_res
- #The residency rate for tagged fish in year of release, moovement rates are equal to (1-tag_scalar)/sum(nregions) OR the scalar determined by the DD parameters if DD movement turned on
-0.97
-0.99
-0.93
-0.96
-0.98
-0.95
-0.94
-
 ##############//////Density-Dependent Movement parameters
   #used with move_switch==8
 ##################################################
 #sigma_T
  #variance term for random T if rand_move==1
-0.35
-0.35
+0.3
+0.3
 #input_Bstar(1,np,1,nreg,1,nages)
   #carrying capacity biomass term, summed value across ages is used for age-invariant DD movement
-400	900	1100	1200	1400	1800	1250	700
-600	800	1000	1200	1500	2000	1000	900
+20000	3000	2000	1000	1000	1000	1000	1000
+10000	2000	2000	1000	1000	1000	1000	1000
 
 ### NOT USED #########################
 #SSB_zero_appor(1,np,1,nreg)
@@ -414,8 +348,8 @@
 5 5 5 5 5 5 5 5
 #DD_residency
   #for age-invariant movement MAKE SURE THESE ARE CONSTANT ACROSS AGES
-0.7 0.8 0.75 0.8 0.75 0.85 0.80 0.85
-0.8 0.7 0.65 0.75 0.8 0.75 0.75 0.75
+0.80 0.80 0.80 0.80 0.80 0.80 0.80 0.80
+0.75 0.75 0.75 0.75 0.75 0.75 0.75 0.75
 
 #return_age - age of return migration for move_switch==6
 7
@@ -538,11 +472,13 @@
 0.75	0.75	0.75	0.75	0.75	0.75	0.75	0.75
 
 #sel_beta1
-1.314260271
-2.448775121
+0.8
+0.8
+
 #sel_beta2
-3.759245849
-3.160453371
+3.0
+3.0
+
 #sel_beta3
 -0.6
 -0.6
@@ -556,12 +492,12 @@
 #************************************************************************************************************
 # SURVEY SELECTIVITY ONLY ESTIMABLE BY POPULATION (not by REGION), therefore to avoid bias make selectivity parameters constant acros REGIONS
 #sel_beta1_survey
-2.512556283
-1.81388624
+0.8
+0.8
 
 #sel_beta2_survey
-2.310794966
-2.643243903
+2.0
+2.0
 
 #sel_beta3_survey
 -0.6
@@ -644,11 +580,11 @@
 ######### **********DO NOT INPUT REGIONALLY VARYING VITAL RATES, NATAL REGION WILL NOT BE PROPERLY TRACKED IN SSB CALCS #############
 #########################################################################################################################################
 #input_weight
-0.4 0.75 1.5 3.0 5.0 7.0 7.5 7.7
+0.1 0.75 1.5 3.0 5.0 7.0 7.5 7.7
 0.5 0.65 2.0 4.0 5.5 7.2 7.9 8.3
 
 #input_catch_weight
-0.4 0.75 1.5 3.0 5.0 7.0 7.5 7.7
+0.1 0.75 1.5 3.0 5.0 7.0 7.5 7.7
 0.5 0.65 2.0 4.0 5.5 7.2 7.9 8.3
 
 #fecundity
@@ -1112,14 +1048,14 @@
 2
 #ph_T_YR_AGE_ALT_FREQ
  # est T at invervals set by T_est_frew and T_age_freq (i.e., every T_est_Freq year and every T_age_freq age)
--5
+-6
 ###########################################################################
 #T_est_age_freq (number age parameters is nages/T_age_freq, rounded up)
  #IF juv_age HIGHER THAN CUTPOINT FOR 2nd AGE CLASS THEN WILL HAVE UNUSED MOVEMENT PARAMETERS AND LIKELY CONVERGENCE ISSUES
-1
+4
 #juv_age
  #age at and below which all Ts  are set to the estimated movement rate for age-1 (when using ph_T_YR_AGE_ALT_FREQ>1)
-1
+2
 ######################################################################################
 #ph_T_CNST
 -5
@@ -1127,24 +1063,10 @@
 -6
 #ph_T_YR_AGE
 -6
-#ph_T_CNST_AGE_no_AG1
- #fix age-1 movement at 100% residency and let rec devs subsume age-1 movement (due to difficulties estimating age-1 movement)
--6
-#ph_T_YR_AGE_no_AG1
- #fix age-1 movement at 100% residency and let rec devs subsume age-1 movement (due to difficulties estimating age-1 movement)
--6
-#ph_T_YR_AGE_ALT_FREQ_no_AG1
- #fix age-1 movement at 100% residency and let rec devs subsume age-1 movement (due to difficulties estimating age-1 movement)
- # est T at invervals set by T_est_freq and T_age_freq (i.e., every T_est_Freq year and every T_age_freq age)
- #Age-1 fixed at 100% residency
--5
 #lb_T
--10
+-5
 #ub_T
-10
-#T_start
- # starting value for T parameters in log space, for 2 pops ==-2 gives ~90% residency, for 3 pops ==-3 gives ~60% residency
--1.5
+5
 #ph_rep_rate_YR
 -6
 #ph_rep_rate_CNST
@@ -1153,14 +1075,7 @@
 -6
 #ub_B
 6
-#ph_T_tag
--7
-#ph_F_tag
--3
-#lb_scalar
--10
-#ub_scalar
-10
+
 #ph_dummy
 -1
 
@@ -1201,23 +1116,19 @@
 #move_pen_switch
  #stabilizes movement parameter estimates...infinite number of large and small values can give same actual movement rate near bounds due to logit transform
  #// ==0 no move pen in log space
- #// ==1 use norm2 move pen on log movement parameters
- #// ==2 use normal move pen log movement parameters
+ #// ==1 include move pen in log space
 0
 
 #wt_move_pen //movement penalty wt
-0.1
+10
+
 #Tpen
-#value against which T estimates are penalized (i.e., deviations from this value are penalized) in log space (i.e., based on the logit transform values)
-# for 2 populations 1.5 centers mean on ~80% residency (~20% movement) and for 3 populations around 70% residency (15% movement to each population)
-# use the negative of the value that want to center estimates around (so that an estimate of the average value provides a zero penalty)
-1.5
+#value below which move_pen enacted (log space)
+-5
 #Tpen2
-#not used
-0.4
-#sigma_Tpen_EM
-#controls deviations from Tpen when move_pen_switch==2
-0.5
+#value above which move_pen enacted(log space)
+5
+
 #controlling error for the EM
 #OBS_survey_fleet_bio_se_EM(1,np_em,1,nreg_em,1,ny,1,nf_em)  #standard errors
 0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2	0.2
