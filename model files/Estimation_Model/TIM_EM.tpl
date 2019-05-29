@@ -176,6 +176,14 @@ DATA_SECTION
    //==0, fit by age-based cohorts
    //==1, fit by region-based cohorts
   init_int do_tag_mult //if==0 assume neg binomial, if==1 assume multinomial (same as OM)
+  init_number est_tag_mixing_switch
+   //determines whether different F or T compared to rest of population in first year of release are estimated  (i.e., estimate F and/or T to account for  incomplete mixing)
+   //==0 F and T same as rest of pop (assume complete mixing)
+   //==1 F is estimated different from rest of population (incomplete mixing F only) in first year of release
+   //==2 T is estimated different from rest of population (incomplete mixing T only) in first year of release
+   //==1 F AND T are estimated different from rest of population (incomplete mixing F AND T) in first year of release
+
+
   init_vector sigma_recruit(1,np)
   
 ///////////////////////////////////////////////////////////////////////////////
@@ -254,6 +262,10 @@ DATA_SECTION
   init_int phase_rep_rate_CNST
   init_number lb_B
   init_number ub_B
+  init_int ph_T_tag
+  init_int ph_F_tag
+  init_int lb_scalar
+  init_int ub_scalar
 
   init_int ph_dummy
   //number ph_theta
@@ -440,6 +452,9 @@ DATA_SECTION
   init_3darray abund_frac_region_year(1,np_om,1,nreg_om,1,ny)
   init_matrix abund_frac_region(1,np_om,1,nreg_om)
 
+  init_vector sim_F_tag_scalar(1,ny_rel)
+  init_vector sim_T_tag_res(1,ny_rel)
+  init_number sim_tag_mixing_switch
 //##########################################################################################################################################
 //#########################################################################################################################################
 //##########################################################################################################################################
@@ -571,6 +586,9 @@ PARAMETER_SECTION
   vector G_app_temp(1,nps);
   
  //movement paramters
+   init_bounded_vector ln_T_tag_res(1,nyr_rel,lb_scalar,ub_scalar,ph_T_tag);
+   init_bounded_vector ln_F_tag_scalar(1,nyr_rel,lb_scalar,ub_scalar,ph_F_tag);
+
    init_bounded_matrix ln_T_YR(1,T_lgth_YR,1,T_lgth-1,lb_T,ub_T,phase_T_YR);
    init_bounded_matrix ln_T_YR_ALT_FREQ(1,T_lgth_YR_ALT_FREQ,1,T_lgth-1,lb_T,ub_T,phase_T_YR_ALT_FREQ);
    init_bounded_matrix ln_T_YR_AGE_ALT_FREQ(1,T_lgth_YR_AGE_ALT_FREQ,1,T_lgth-1,lb_T,ub_T,phase_T_YR_AGE_ALT_FREQ);
@@ -579,7 +597,8 @@ PARAMETER_SECTION
    init_bounded_matrix ln_T_CNST(1,T_lgth,1,T_lgth-1,lb_T,ub_T,phase_T_CNST);
    matrix G(1,T_lgth,1,T_lgth);
    vector G_temp(1,T_lgth);
-
+   vector T_tag_res(1,nyr_rel);
+   vector F_tag_scalar(1,nyr_rel);
 //reporting rate
   //*****FOLLOWING WILL ONLY WORK PROPERLY IF ONLY 1 POP OR  NUMBER OF REGIONS IS CONSTANT ACROSS POPULATIONS****************
    init_bounded_matrix ln_rep_rate_YR(1,YR_APP,1,parreg,lb_B,ub_B,phase_rep_rate_YR);
@@ -681,6 +700,8 @@ PARAMETER_SECTION
   5darray T_year(1,nps,1,nr,1,nyr,1,nps,1,nr) 
   7darray recaps(1,nps,1,nr,1,nyr_rel,1,nag,1,tag_age,1,nps,1,nr) //recaps
   7darray tag_recap_no_age_temp(1,nps,1,nr,1,nyr_rel,1,tag_age,1,nps,1,nr,1,nag) //recaps
+  4darray F_tag(1,nps,1,nr,1,nyr_rel,1,nag)
+  6darray T_tag(1,nps,1,nr,1,nyr_rel,1,nag,1,nps,1,nr)
   
  // 6-d arrays
  6darray survey_fleet_overlap_age(1,nps,1,nps,1,nr,1,nyr,1,nfls,1,nag) 
@@ -853,7 +874,7 @@ PARAMETER_SECTION
  3darray abundance_total_temp(1,nyr,1,nag,1,nps)
  3darray total_recap_temp(1,nps,1,nr,1,tag_age)
  matrix tags_avail_temp(1,nps,1,nr)
- 3darray tag_prop_temp(1,nps,1,nyr_rel,1,nr)
+ 3darray tag_prop_temp(1,nps,1,max_life_tags,1,nr)
  5darray tag_prop_temp2(1,nps,1,nr,1,nyr_rel,1,nag,1,nt2)
  4darray tag_prop_temp2_no_age(1,nps,1,nr,1,nyr_rel,1,nt2)
 
@@ -3815,6 +3836,13 @@ FUNCTION get_tag_recaptures
   // using subscript notation this equals= (a+y-xx)
   // similarly because account for release age, do not need to worry about plus group calcs as carry recaptures out to max_life_tags and never assume plus group (just use plus group mortality and movement values in calcs where a>=max_age)
   /////////////////////////////////////////////////////////////////////////////
+
+    for(int x=1; x<=nyrs_release; x++)
+     {
+      T_tag_res(x)=(mfexp(ln_T_tag_res(x)))/(mfexp(ln_T_tag_res(x))+1); //bec proportion use logit to bound between 0 and 1
+      F_tag_scalar(x)=mfexp(ln_F_tag_scalar(x))/(mfexp(ln_F_tag_scalar(x))+1);
+     }
+ 
  if(do_tag==1)
   {
  //assume tags released in natal population
@@ -3836,6 +3864,8 @@ FUNCTION get_tag_recaptures
              tag_age_sel=age_full_selection(j,r,xx);
               if(y==1) //year of release for a cohort
                {              
+                if(est_tag_mixing_switch==0) //assume complete mixing of tagged and untagged fish
+                 {
                  tags_avail(i,n,x,a,y,j,r)=ntags(i,n,x,a)*T(i,n,xx,a,j,r); 
                  recaps(i,n,x,a,y,j,r)=report_rate(j,x,r)*tags_avail(i,n,x,a,y,j,r)*F(j,r,xx,a)*(1.-mfexp(-(F(j,r,xx,a)+M(j,r,xx,a))))/(F(j,r,xx,a)+(M(j,r,xx,a)));  //recaps=tags available*fraction of fish that die*fraction of mortality due to fishing*tags inspected (reporting)
                if(fit_tag_age_switch==1) //need to determine age of full selectivity for tagging data if assuming don't know age of tags
@@ -3843,9 +3873,80 @@ FUNCTION get_tag_recaptures
                  tags_avail(i,n,x,a,y,j,r)=ntags(i,n,x,a)*T(i,n,xx,tag_age_sel,j,r); 
                  recaps(i,n,x,a,y,j,r)=report_rate(j,x,r)*tags_avail(i,n,x,a,y,j,r)*F(j,r,xx,tag_age_sel)*(1.-mfexp(-(F(j,r,xx,tag_age_sel)+M(j,r,xx,tag_age_sel))))/(F(j,r,xx,tag_age_sel)+(M(j,r,xx,tag_age_sel)));  //recaps=tags available*fraction of fish that die*fraction of mortality due to fishing*tags inspected (reporting)                                
                 }
+                }
+
+                if(est_tag_mixing_switch>0) //assume incomplete mixing of tagged and untagged fish
+                 {
+                if(est_tag_mixing_switch==1) //assume incomplete mixing of tagged and untagged fish
+                 {
+                   tags_avail(i,n,x,a,y,j,r)=ntags(i,n,x,a)*T(i,n,xx,a,j,r); 
+                 }
+                 if(est_tag_mixing_switch==2 || est_tag_mixing_switch==3) //assume incomplete mixing of tagged and untagged fish 
+                  {                 
+                   if(i==j && n==r)
+                    {
+                      T_tag(i,n,x,a,j,r)=T_tag_res(x);
+                    }
+                   if(i!=j || n!=r)
+                    {
+                      T_tag(i,n,x,a,j,r)=(1-T_tag_res(x))/(sum(nregions)-1); //split movement evenly across remaining regions
+                     }
+                    
+                      if(T_tag(i,n,x,a,j,r)>1)
+                       {
+                        T_tag(i,n,x,a,j,r)=1;
+                       }
+                      if(T_tag(i,n,x,a,j,r)<0)
+                       {
+                        T_tag(i,n,x,a,j,r)=0;
+                       }
+                      
+                    tags_avail(i,n,x,a,y,j,r)=ntags(i,n,x,a)*T_tag(i,n,x,a,j,r);                        
+                   }
+                 if(est_tag_mixing_switch==2) //assume incomplete mixing of tagged and untagged fish 
+                  {
+                   recaps(i,n,x,a,y,j,r)=report_rate(j,x,r)*tags_avail(i,n,x,a,y,j,r)*F(j,r,xx,a)*(1.-mfexp(-(F(j,r,xx,a)+M(j,r,xx,a))))/(F(j,r,xx,a)+(M(j,r,xx,a)));  //recaps=tags available*fraction of fish that die*fraction of mortality due to fishing*tags inspected (reporting)
+                  }
+                 if(est_tag_mixing_switch==1 || est_tag_mixing_switch==3) //assume incomplete mixing of tagged and untagged fish 
+                  {                  
+                   F_tag(j,r,x,a)=F_tag_scalar(x)*F(j,r,xx,a);
+                   recaps(i,n,x,a,y,j,r)=report_rate(j,x,r)*tags_avail(i,n,x,a,y,j,r)*(F_tag_scalar(x)*F(j,r,xx,a))*(1.-mfexp(-((F_tag_scalar(x)*F(j,r,xx,a))+M(j,r,xx,a))))/((F_tag_scalar(x)*F(j,r,xx,a))+(M(j,r,xx,a)));  //recaps=tags available*fraction of fish that die*fraction of mortality due to fishing*tags inspected (reporting)
+                  }
+           //    if(fit_tag_age_switch==1) //need to determine age of full selectivity for tagging data if assuming don't know age of tags
+             //   {
+               //  tags_avail(i,n,x,a,y,j,r)=ntags(i,n,x,a)*T(i,n,xx,tag_age_sel,j,r); 
+                // recaps(i,n,x,a,y,j,r)=report_rate(j,x,r)*tags_avail(i,n,x,a,y,j,r)*F(j,r,xx,tag_age_sel)*(1.-mfexp(-(F(j,r,xx,tag_age_sel)+M(j,r,xx,tag_age_sel))))/(F(j,r,xx,tag_age_sel)+(M(j,r,xx,tag_age_sel)));  //recaps=tags available*fraction of fish that die*fraction of mortality due to fishing*tags inspected (reporting)                                
+               // }
                }
-              if(y>1) // must account for the maximum age so use min function to ensure that not exceeding the max age
+              }
+
+           if((est_tag_mixing_switch==1 || est_tag_mixing_switch==3) && y==2) //assume incomplete mixing of tagged and untagged fish
               {
+               tags_avail_temp=0;
+               for(int p=1;p<=npops;p++)
+               {
+                for (int s=1;s<=nregions(p);s++)
+                {
+                 if(natal_homing_switch==0) //if no natal homing
+                 {
+                  tags_avail_temp(p,s)=tags_avail(i,n,x,a,y-1,p,s)*T(p,s,(xx+y-1),min((a+y),nages),j,r)*mfexp(-((F_tag_scalar(x)*F(p,s,(xx+y-2),min(((a+y)-1),nages)))+(M(p,s,(xx+y-2),min(((a+y)-1),nages))))); //tags_temp holds all tags moving into population j,region r; min function takes min of true age and max age allowed (plus group)
+                 }                        
+                //#####################################################################################################
+                //  TRUE NATAL HOMING  T(n,x,a,y,j) becomes T(i,x,a,y,j) because need to maintain your natal origin
+                //  movement values so T doesn't depend on current population only origin population and destination population
+                //########################################################################################################              
+                 if(natal_homing_switch==1) //if natal homing 
+                 {
+                  tags_avail_temp(p,s)=tags_avail(i,n,x,a,y-1,p,s)*T(i,n,(xx+y-1),min((a+y),nages),j,r)*mfexp(-((F_tag_scalar(x)*F(p,s,(xx+y-2),min(((a+y)-1),nages)))+(M(p,s,(xx+y-2),min(((a+y)-1),nages))))); //tags_temp holds all tags moving into population j,region r; min function takes min of true age and max age allowed (plus group)             
+                 }               
+                }
+               }
+                 tags_avail(i,n,x,a,y,j,r)=sum(tags_avail_temp); //sum across all pops/regs of tags that moved into pop j reg r
+                 recaps(i,n,x,a,y,j,r)=report_rate(j,x,r)*tags_avail(i,n,x,a,y,j,r)*F(j,r,(xx+y-1),min((a+y),nages))*(1.-mfexp(-(F(j,r,(xx+y-1),min((a+y),nages))+(M(j,r,(xx+y-1),min((a+y),nages))))))/(F(j,r,(xx+y-1),min((a+y),nages))+(M(j,r,(xx+y-1),min((a+y),nages))));  //recaps=tags available*fraction of fish that die*fraction of mortality due to fishing*tags inspected (reporting)                 
+               }
+
+         if(y>1 && (y>2 || est_tag_mixing_switch==0))
+            {
                tags_avail_temp=0;
                for(int p=1;p<=npops;p++)
                {
@@ -3889,6 +3990,7 @@ FUNCTION get_tag_recaptures
          }
         }
        }
+      
  for (int i=1;i<=npops;i++)
   {
    for (int n=1;n<=nregions(i);n++)
@@ -4222,7 +4324,7 @@ FUNCTION evaluate_the_objective_function
              }
             if(diagnostics_switch==1) //use true values for diagnostic runs
              {
-              OBS_tag_prop_final(i,n,x,a,s)=tag_prop_final_TRUE(i,n,x,a,s);
+              OBS_tag_prop_final(i,n,x,a)=tag_prop_final_TRUE(i,n,x,a);
              }
             if(max_life_tags<=(nyrs-xx+1)) //complete cohorts so don't need to adjust to avoid recap entries with no possible recaptures
              {
@@ -4265,7 +4367,7 @@ FUNCTION evaluate_the_objective_function
            }
           if(diagnostics_switch==1) //use true values for diagnostic runs
            {
-            OBS_tag_prop_final_no_age(i,n,x,s)=tag_prop_final_TRUE_no_age(i,n,x,s);
+            OBS_tag_prop_final_no_age(i,n,x)=tag_prop_final_TRUE_no_age(i,n,x);
            }
           if(max_life_tags<=(nyrs-xx+1)) //complete cohorts so don't need to adjust to avoid recap entries with no possible recaptures
            {
@@ -4800,6 +4902,21 @@ REPORT_SECTION
   report<<abundance_at_age_BM<<endl;
   report<<"$abund_at_age_AM"<<endl;
   report<<abundance_at_age_AM<<endl;
+
+        report<<"$F_tag_scalar"<<endl;
+        report<<F_tag_scalar<<endl;
+        report<<"$T_tag_res"<<endl;
+        report<<T_tag_res<<endl;
+        report<<"$sim_F_tag_scalar"<<endl;
+        report<<sim_F_tag_scalar<<endl;
+        report<<"$sim_T_tag_res"<<endl;
+        report<<sim_T_tag_res<<endl;
+        report<<"$est_tag_mixing_switch"<<endl;
+        report<<est_tag_mixing_switch<<endl;
+        report<<"$sim_tag_mixing_switch"<<endl;
+        report<<sim_tag_mixing_switch<<endl;
+        report<<"$fit_tag_age_switch"<<endl;
+        report<<fit_tag_age_switch<<endl;
 
 
   report<<"$dummy_run"<<endl;
